@@ -1,0 +1,51 @@
+/*# debutExtendDir #*/
+func real[int] extendDir(real[int] ud, bool hom)
+// Solve local Dirichlet problems with ud at the interface
+// homogeneous on the real boundary (hom = 1) or not (hom = 0) 
+{  
+   Vh s=0;	   
+   for(int i=0;i<npart;++i)
+     {
+       real[int] ui = Rih[i]*ud;               // local solution  
+       real[int] bi = ui .* auntgv[i][];      // take into account the interface conditions
+       if (hom)
+           bi = auntgv[i][] ? bi : 0;           // update rhs
+       else
+           bi = auntgv[i][] ? bi : rhsid[i][];       
+       ui= aA[i] ^-1 * bi;                       // solve local Dirichlet problem                                      
+       bi = Dih[i]*ui;                             // use the partition of unity 
+       s[]+= Rih[i]'*bi;                          // extend the local solution globally                               
+    }      
+   return s[];	
+}	
+/*# finExtendDir #*/
+// In order to use myPCG routine define first then matrix-vector product
+/*# debutDtN #*/
+func real[int] A(real[int] &l)                 // DtN operator
+{
+  Vh ui, rn, s;	
+  ui[]=l.*intern[];		
+  s[] = extendDir(ui[],1);
+  rn[]= Aglobal*s[];
+  rn[] = rn[] .* intern[];
+  return rn[]; 
+}
+/*# finDtN #*/
+/*# debutNtD #*/
+// and the application of the preconditioner
+func real[int] Mm1(real[int] &l)      // preconditionner = NtD operator       
+{   
+  Vh s = 0,rn; 	
+  rn[] = l;                               
+  for(int i=0;i<npart;++i)
+     {
+       real[int] rb = Rih[i]*rn[];
+       real[int] ri = Dih[i]*rb;              // local residual                                                                           
+       real[int] ui = aN[i] ^-1 * ri;       // local solution of the Neumann problem                    
+       real[int] bi = Dih[i]*ui;
+       s[]+= Rih[i]'*bi;                       // extend the local solution globally     	
+     }
+  s[] = s[].*intern[];    
+  return s[];
+}
+/*# finNtD #*/

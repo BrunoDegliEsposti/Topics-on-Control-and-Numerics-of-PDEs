@@ -1,0 +1,56 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataBNN.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],0,aTh,Rih,Dih,Ndeg,AreaThi);
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver=UMFPACK);    
+rhsglobal[] = vaglobal(0,Vh); 
+uglob[] = Aglobal^-1*rhsglobal[];
+/*# finGlobalData #*/
+/*# debutLocalData #*/
+mesh Thi=Th;                                   // freefem's trick, formal definition
+fespace Vhi(Thi,P1);                        // freefem's trick, formal definition
+Vhi[int] rhsid(npart),rhsin(npart);      // local right hand sides
+Vhi[int] auntgv(npart);
+plot(part, wait=1,fill=1,ps="Decomp.eps");
+for(int i=0;i<npart;++i)
+  {
+    Thi=aTh[i];          
+    varf vad(u,v) =  int2d(Thi)(eta*u*v+kappa*Grad(u)'*Grad(v))
+                         + on(1,u=g) + int2d(Thi)(f*v)    // Dirichlet pb. -Delta (u)=f , u=g on the boundary
+                         + on(10,u=0);                           // Dirichlet BC on the interface    
+    varf van(u,v) = int2d(Thi)(etan*u*v+kappa*Grad(u)'*Grad(v))
+                         + on(1,u=g) + int2d(Thi)(f*v)    // Dirichlet pb. -Delta (u)=f , u=g on the boundary
+                          ;                                               // Neumann BC on the interface       
+    aA[i] = vad(Vhi,Vhi,solver=UMFPACK);        // local "Dirichlet" matrix        
+    aN[i] = van(Vhi,Vhi,solver=UMFPACK);        // local "Neumann" matrix 
+    rhsid[i][]= vad(0,Vhi);                                     // local "Dirichlet" rhs
+    rhsin[i][]= van(0,Vhi);                                     // local "Neumann" rhs 
+    varf vaun(u,v) = on(10,u=1);
+    auntgv[i][] = vaun(0,Vhi);                               // array of tgv on Gamma intern, 0 elsewhere 
+  }     
+/*# finLocalData #*/
+/*# debutPCGSolve #*/ 
+Vh s, b, un, gd;
+include "../../FreefemCommon/matvecDtNtd.idp"
+include "../../FreefemCommon/coarsespace.idp"
+// compute rhs of the interface problem: b[]
+un = 0;
+gd[]=g;
+un[]+= bord[].*gd[];   
+s[] = extendDir(un[],0);
+b[]= Aglobal*s[];
+b[]-= rhsglobal[];
+b[] *= -1;
+include "PCG-BNN.idp"
+Vh lam = 0,sol;
+lam[] = lam[].*intern[];                      // insures that the first iterate verifies 
+lam[]+= bord[].*gd[];                        // the global BC, from iter=1 on this is true 
+sol[] = myPCG(lam[],tol,maxit);
+sol[] = extendDir(sol[],0);
+Vh err = sol-uglob;
+plot(sol,cmm=" Final Solution", wait=1,dim=3,fill=1,value=1);
+cout << " Final error: " << err[].linfty << endl;
+ /*# finPCGSolve #*/ 

@@ -1,0 +1,8 @@
+\babel@toc {italian}{}
+\babel@toc {italian}{}
+\beamer@sectionintoc {1}{The importance of being scalable}{3}{0}{1}
+\beamer@sectionintoc {2}{What is domain decomposition?}{11}{0}{2}
+\beamer@sectionintoc {3}{Schwarz's method and its limitations}{16}{0}{3}
+\beamer@sectionintoc {4}{Jacobi-Schwarz, RAS, ASM}{25}{0}{4}
+\beamer@sectionintoc {5}{Two-level methods to the rescue}{33}{0}{5}
+\beamer@sectionintoc {6}{Beyond Poisson's equation}{44}{0}{6}

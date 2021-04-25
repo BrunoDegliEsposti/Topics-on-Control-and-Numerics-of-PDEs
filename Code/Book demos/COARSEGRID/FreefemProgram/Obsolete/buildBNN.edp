@@ -1,0 +1,17 @@
+int j;
+
+include "buildE.edp";
+include "buildQ.edp";
+include "buildP.edp";
+include "RAS-precond.edp";
+
+func real[int] BNN(real[int] &u)   // precond BNN
+{ 
+    real[int] aux1 = Q(u);
+    real[int] aux2 = P(u);
+    real[int] aux3 = Mm1(aux2);
+    aux2 = PT(aux3);
+    aux2 += aux1;	
+    ++j;
+	return aux2;	
+}

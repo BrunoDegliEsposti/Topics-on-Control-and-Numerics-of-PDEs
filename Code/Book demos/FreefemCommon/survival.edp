@@ -1,0 +1,71 @@
+// Survival Kit program
+/*# debut1 #*/
+// Number of mesh points in x and y directions
+int Nbnoeuds=10;
+/*# fin1 #*/
+
+/*# debut2 #*/
+//Mesh definition
+mesh Th=square(Nbnoeuds,Nbnoeuds,[x,y]);
+/*# fin2 #*/
+
+/*# debut3 #*/
+// Functions of x and y
+func f=x*y;
+func g=1.;
+/*# fin3 #*/
+
+/*# debut4 #*/
+// Finite element space on the mesh Th
+fespace Vh(Th,P1);
+//uh and vh are of type Vh
+Vh uh,vh;
+/*# fin4 #*/
+
+/*# debut5 #*/
+// variational problem definition
+problem heat(uh,vh,solver=LU)=
+        int2d(Th)(dx(uh)*dx(vh)+dy(uh)*dy(vh))
+        -int2d(Th)(f*vh)
+        +on(1,2,3,4,uh=0);
+/*# fin5 #*/
+
+/*# debut6 #*/        
+//Solving the problem
+heat;
+// Plotting the result
+plot(uh,wait=1);
+/*# fin6 #*/
+
+/*# debut7 #*/
+// Changing boundary conditions to Neumann or Robin
+real alpha =1.;
+problem heatRobin(uh,vh)=
+	int2d(Th)(dx(uh)*dx(vh)+dy(uh)*dy(vh))
+	+int1d(Th,3,4)(alpha*uh*vh)
+	-int1d(Th,3,4)(g*vh)
+	-int2d(Th)(f*vh)
+	+on(2,uh=0);
+/*# fin7 #*/
+
+/*# debut8 #*/
+// Using linear algebra package	
+varf varheatRobin(uh,vh)=
+	int2d(Th)(dx(uh)*dx(vh)+dy(uh)*dy(vh))
+	+int1d(Th,3,4)(alpha*uh*vh)
+	-int1d(Th,3,4)(g*vh)
+	-int2d(Th)(f*vh)
+	+on(2,uh=0);
+/*# fin8 #*/
+
+/*# debut9 #*/
+// Retrieving the stiffness matrix
+matrix Aglobal; // sparse matrix
+Aglobal = varheatRobin(Vh,Vh,solver=UMFPACK); // stiffness matrix
+                                         // UMFPACK direct solver
+// Retrieving the right hand side
+Vh rhsglobal;  
+rhsglobal[] = varheatRobin(0,Vh);             //right hand side vector of d.o.f's	
+// Solving the problem by a sparse LU solver
+uh[] = Aglobal^-1*rhsglobal[];
+/*# fin9 #*/

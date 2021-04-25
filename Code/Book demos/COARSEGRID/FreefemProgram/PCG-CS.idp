@@ -1,0 +1,66 @@
+// Preconditioned Conjugate Gradient Applied to the system
+// M^{-1}Aglobal x = M^{-1}b
+// Here Aglobal denotes the global matrix
+// M^{-1} is the ASM preconditioner based on domain decomposition
+/*# debutBNNPrecond #*/
+func real[int] AS2(real[int] & r){
+		real[int] z = Q(r);
+		real[int] aux = AS(r);
+		z += aux;
+	   return z;
+}
+func real[int] BNN(real[int] &u)   // precond BNN
+{ 
+    real[int] aux1 = Q(u);
+    real[int] aux2 = P(u);
+    real[int] aux3 = AS(aux2);
+    aux2 = PT(aux3);
+    aux2 += aux1;	
+	return aux2;	
+}
+/*# finBNNPrecond #*/
+/*# debutCGSolve #*/  
+func real[int] myPCG(real[int] xi,real eps, int nitermax)
+{
+	ofstream filei("Convprec.m");          // Matlab convergence history file
+	ofstream fileignu("Convprec.gnu"); // Gnuplot convergence history file
+    Vh r, un, p, zr, zrel, rn, w, er;
+    un[] = xi; 
+    r[] = A(un[]);     
+    r[] -= rhsglobal[];     
+    r[] *= -1.0;                                  
+    zr[] = BNN(r[]);
+    real resinit=sqrt(zr[]'*zr[]);
+    p = zr;
+    for(int it=0;it<nitermax;++it)
+      { 
+       	//plot(un,value=1,wait=1,fill=1,dim=3,cmm="Approximate solution at iteration "+it);        
+        real relres = sqrt(zr[]'*zr[])/resinit;
+        cout << "It: "<< it << " Relative residual = " << relres   << endl; 
+        int j = it+1;
+        filei << "relres("+j+")=" << relres << ";" << endl;      
+        fileignu << relres << endl;
+        if(relres < eps)
+           {
+            cout << "CG has converged in " + it + " iterations " << endl;
+            cout << "The relative residual is " +  relres << endl; 
+            break;	
+           }	
+        w[] = A(p[]);                                    
+        real alpha = r[]'*zr[];
+        real aux2 = alpha;
+        real aux3 = w[]'*p[];
+        alpha /= aux3;                     // alpha = (rj,zj)/(Apj,pj);
+        un[] += alpha*p[];                // xj+1 = xj + alpha*p;
+        r[] -= alpha*w[];                   // rj+1 = rj - alpha*Apj;      
+        zr[] = BNN(r[]);                    // zj+1 = M^-1*rj+1;
+        real beta = r[]'*zr[];    
+        beta /= aux2;                       // beta = (rj+1,zj+1)/(rj,zj);
+        p[] *= beta;
+        p[] += zr[];      
+        plot(un,cmm="  Solution at iteration "+it, wait=1,dim=3,fill=1,value=1);
+
+      }
+    return un[];  	
+}
+/*# finCGSolve #*/

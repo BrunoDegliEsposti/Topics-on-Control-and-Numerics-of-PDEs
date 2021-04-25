@@ -1,0 +1,16 @@
+func real[int] Q(real[int] &l)   // Q = Z*E^-1*Z^T
+{
+   real[int] res(l.n);
+   res=0.;
+   real[int] vaux(npart);
+   for(int i=0;i<npart;++i)
+   {
+   	  vaux[i]=Z[i][]'*l;
+   }	
+   real[int] zaux=E^-1*vaux;     // zaux=E^-1*Z^T*l
+   for(int i=0;i<npart;++i)      // Z*zaux
+   {
+   	  res +=zaux[i]*Z[i][];
+   }
+   return res;
+}

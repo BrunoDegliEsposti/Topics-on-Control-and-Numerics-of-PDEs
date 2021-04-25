@@ -1,0 +1,43 @@
+load "metis"
+load "medit"
+int nn=2,mm=2,ll=2;        // number of the domains in each direction
+int npart= nn*mm*ll;	       // total number of domains
+int nloc = 11;                   // local no of dof per domain in one direction            
+bool withmetis = 1;          // =1 (Metis decomp) =0 (uniform decomp)
+int sizeovr = 2;                 // size of the overlap 
+real allongx, allongz;
+allongx = real(nn)/real(mm);
+allongz = real(ll)/real(mm);
+// Build the mesh
+include "cube.idp"
+int[int] NN=[nn*nloc,mm*nloc,ll*nloc];
+real [int,int] BB=[[0,allongx],[0,1],[0,allongz]]; // bounding box
+int [int,int] L=[[1,1],[1,1],[1,1]];                        // the label of the 6 faces 
+mesh3 Th=Cube(NN,BB,L);                           // left,right,front, back, down, right
+fespace Vh(Th,P1);
+fespace Ph(Th,P0);
+Ph part;                                          // piecewise constant function 
+int[int] lpart(Ph.ndof);                     // giving the decomposition
+// domain decomposition data structures
+mesh3[int] aTh(npart);                   // sequence of ovr. meshes 
+matrix[int] Rih(npart);                     // local restriction operators 
+matrix[int] Dih(npart);                     // partition of unity operators
+int[int] Ndeg(npart);                        // number of dof for each mesh
+real[int] VolumeThi(npart);             // volume of each subdomain
+matrix[int] aA(npart);                      // local Dirichlet matrices
+Vh[int]  Z(npart);                             // coarse space
+// Definition of the problem to solve
+// Delta (u) = f, u = 1 on the global boundary
+Vh intern;
+intern = (x>0) && (x<allongx) && (y>0) && (y<1) && (z>0) && (z<allongz);
+Vh bord = 1-intern;
+macro Grad(u) [dx(u),dy(u),dz(u)]    // EOM 
+func f = 1;                                          // right hand side 
+func g = 1;                                         // Dirichlet data
+Vh rhsglobal,uglob;                            // rhs and solution of the global problem  
+varf vaglobal(u,v) = int3d(Th)(Grad(u)'*Grad(v))
+                              +on(1,u=g) + int3d(Th)(f*v);
+matrix Aglobal;
+// Iterative solver
+real tol=1e-10;                                     // tolerance for the iterative method
+int maxit=200;                                    // maximum number of iterations

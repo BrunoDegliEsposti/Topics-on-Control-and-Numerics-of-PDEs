@@ -1,0 +1,60 @@
+// Preconditioned Conjugate Gradient Applied to the 
+// Interface problem based on Dirichlet interface conditions
+// preconditioned by the interface problem with Neumann conditions
+// CG - Neumann Neumman algorithm
+/*# debutBNNprecond #*/ 
+func real[int] BNN(real[int] &u)               // precond BNN
+{ 
+	real[int] aux2=Mm1(u);
+    if(withBNN){
+	    real[int] aux1 = Q(u);
+	    aux2 = P(u);
+	    real[int] aux3 = Mm1(aux2);
+	    aux2 = PT(aux3);
+	    aux2 += aux1;
+    }
+	return aux2;	
+}
+/*# finBNNprecond #*/
+/*# debutCGSolve #*/  
+func real[int] myPCG(real[int] xi,real eps, int nitermax)
+{
+    ofstream filei("ConvBNN.m");
+	ofstream fileignu("ConvBNN.gnu");
+    Vh r, err, sol, un,p,zr, rn,w;
+    un[] = xi;        
+    r[] = A(un[]);        
+    r[] -= b[];     
+    r[] *= -1.0;                                 // initial residual
+    zr[] = BNN(r[]);
+    p = zr;  
+    real resinit = sqrt(r[]'*r[]);
+    for(int it=0;it<nitermax;++it)
+      {
+      	 real  relres = sqrt(r[]'*r[])/resinit;        
+      	 cout << "It: "<< it << " Relative residual = " << relres   <<  endl; 
+         int j = it+1;
+         filei << "relres("+j+")=" << relres << ";" << endl;      
+         fileignu << relres << endl;
+         if(relres < eps)
+           {
+            cout << "PCG has converged in " + it + " iterations " << endl;
+            cout << "The relative residual is " +  relres << endl; 
+            break;	
+           }	
+        w[] = A(p[]);             
+        real alpha = r[]'*zr[];
+        real aux2 = alpha;
+        real aux3 = w[]'*p[];
+        alpha /= aux3;             // alpha = (rj,zj)/(Apj,pj);
+        un[] += alpha*p[];        // xj+1 = xj + alpha*p;
+        r[] -= alpha*w[];           // rj+1 = rj - alpha*Apj;                                    
+        zr[] = BNN(r[]);            // zj+1 = M^-1*rj+1; 
+        real beta = r[]'*zr[];    
+        beta /= aux2;               // beta = (rj+1,zj+1)/(rj,zj);
+        p[] *= beta;
+        p[] += zr[];
+      }
+    return un[];  	
+}
+/*# finCGSolve #*/ 

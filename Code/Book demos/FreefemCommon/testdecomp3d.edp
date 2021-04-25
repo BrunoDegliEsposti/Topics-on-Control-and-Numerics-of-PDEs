@@ -1,0 +1,18 @@
+include "data3d.edp"
+include "decomp3d.idp"
+include "createPartition3d.idp"
+medit("part", Th, part, order = 1);
+SubdomainsPartitionUnity3(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,VolumeThi);
+// check the partition of unity
+Vh sum=0,fctone=1;
+for(int i=0; i < npart;i++)
+{
+	Vh localone;
+    real[int] bi = Rih[i]*fctone[];  // restriction to the local domain
+    real[int] di = Dih[i]*bi;
+    localone[] = Rih[i]'*di;
+    sum[] +=localone[] ;
+    medit("loc",Th, localone, order = 1);
+    medit("subdomains",aTh[i]);
+}
+medit("sum",Th, sum, order = 1);

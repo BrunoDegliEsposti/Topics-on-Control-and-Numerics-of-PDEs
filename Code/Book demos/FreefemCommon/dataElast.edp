@@ -1,0 +1,44 @@
+load "metis"
+load "medit"
+int nn=3,mm=3;							  // number of the domains in each direction
+int npart= nn*mm;						  // total number of domains
+int nloc = 20;                                  // local no of dof per domain in one direction            
+bool withmetis = 1;                         // =1 (Metis decomp) =0 (uniform decomp) 
+int sizeovr = 2;                                // size of the overlap
+real allong = real(nn)/real(mm);     // aspect ratio of the global domain
+func E = 2*10^11;                           // Young modulus ans Poisson ratio
+func sigma = 0.3; 
+func lambda = E*sigma/((1+sigma)*(1-2*sigma)); // Lame coefficients
+func mu = E/(2*(1+sigma));
+real sqrt2=sqrt(2.);
+func eta = 1.0e-6;      
+// Mesh of a rectangular domain
+mesh Th=square(nn*nloc,mm*nloc,[x*allong,y]);
+fespace Vh(Th,[P1,P1]);                 // vector fem space
+fespace Uh(Th,P1);                        // scalar fem space
+fespace Ph(Th,P0);
+Ph part;                                           // piecewise constant function 
+int[int] lpart(Ph.ndof);                       // giving the decomposition
+// Domain decomposition data structures
+mesh[int] aTh(npart);                       // sequence of ovr. meshes 
+matrix[int] Rih(npart);                       // local restriction operators 
+matrix[int] Dih(npart);                       // partition of unity operators
+int[int] Ndeg(npart);                          // number of dof for each mesh
+real[int] AreaThi(npart);                    // area of each subdomain
+matrix[int] aA(npart);                         // local Dirichlet matrices
+// Definition of the problem to solve
+int[int] chlab=[1,11  ,2,2  ,3,33  ,4,1  ]; //Dirichlet conditions for label = 1
+Th=change(Th,refe=chlab);
+macro Grad(u) [dx(u),dy(u)]                                 // EOM 
+macro epsilon(u,v)  [dx(u),dy(v),(dy(u)+dx(v))/sqrt2] // EOM
+macro div(u,v) ( dx(u)+dy(v) )                              // EOM
+func uboundary =  (0.25 - (y-0.5)^2);
+varf vaBC([u,v],[uu,vv]) = on(1, u = uboundary, v=0) + on(11, u = 0, v=0) + on(33, u=0,v=0);
+// global problem
+Vh [rhsglobal,rrhsglobal], [uglob,uuglob];        
+macro Elasticity(u,v,uu,vv)  eta*(u*uu+v*vv) + lambda*(div(u,v)*div(uu,vv))+2.*mu*( epsilon(u,v)'*epsilon(uu,vv) ) // EOM
+varf vaglobal([u,v],[uu,vv]) = int2d(Th)(Elasticity(u,v,uu,vv)) + vaBC; // on(1,u=uboundary,v=0)   
+matrix Aglobal;
+// Iterative solver parameters
+real tol=1e-6;                                     // tolerance for the iterative method
+int maxit=200;                                    // maximum number of iterations

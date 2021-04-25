@@ -1,0 +1,132 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataGENEO.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,AreaThi); 
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = sparsesolver);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                // global rhs
+//rhsglobal[] *= -1.;
+uglob[] = Aglobal^-1*rhsglobal[]; 
+plot(uglob,cmm=" Direct method solution", wait=1,dim=3,fill=1,value=1);
+/*# finGlobalData #*/
+/*# debutLocalData #*/   
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = sparsesolver);       // direct solvers using Sparsesolver
+    cout << " Local problem of subdomain " << i << " factorized " << endl;
+    varf valocal(u,v) = int2d(aTh[i])(eta*u*v+kappa*(Grad(u)'*Grad(v)))
+                              +on(1,u=g);           
+    fespace Vhi(aTh[i],P1);                          
+    aN[i]= valocal(Vhi,Vhi);
+    set(aN[i],solver = sparsesolver);    
+    cout << " Local Neumann problem of subdomain " << i << " factorized " << endl;
+    matrix atimesxi = aA[i] * Dih[i]; 
+    aAweighted[i] = Dih[i] * atimesxi; 
+    set(aAweighted[i],solver = sparsesolver);
+    cout << " Local weighted problem of subdomain " << i << " factorized " << endl;
+ } 
+/*# finLocalData #*/  
+/*# debutCoarseSpace #*/
+int nev=10;
+int ncoarsespace ;
+int ncoarsespacemax;
+if (nev == 0)
+{
+	ncoarsespace = npart;
+	ncoarsespacemax = npart;
+}
+else if (nev > 0)
+{
+		ncoarsespacemax = nev*npart;
+}
+Vh[int]  Z(ncoarsespacemax);
+
+if(nev == 0)
+{
+	for(int i=0;i<npart;++i)
+	{	
+		Z[i]=1.;
+		real[int] zit = Rih[i]*Z[i][];
+		real[int] zitemp = Dih[i]*zit;
+		Z[i][]=Rih[i]'*zitemp;
+	}
+}
+else if (nev >0) // Geneo Coarse Space
+{
+	real smallestEigNotinGeneo = 0.;
+	ncoarsespace =  0;
+	for(int i=0;i<npart;++i)
+	{	
+		// search for the nev smallest eigenvalues in subdomain i
+		int neigen = nev+1;	
+		real[int] ev(neigen);	
+    	mesh Thi;
+	    Thi=aTh[i];
+    	fespace Vhi(Thi,P1);// lack of generality !!!
+		Vhi[int] eV(neigen);	 
+		cout<<"GENEO eigenvalue solve in domain  ============= "<<i<<endl; 
+		int k=EigenValue(aN[i],aAweighted[i],sym=true,sigma=0,value=ev,vector=eV);	
+		k=min(k,nev); 					//some time the number of converged eigen value is  greater then nev..
+		cout << ev <<endl;
+		real evtemp=ev[0];	 
+		cout << "evtemp = " << evtemp << endl;
+	for(int j=0;j<nev;++j)
+	{
+		plot(eV[j],wait=1,fill=1,value=1,dim=3,cmm="Geneo "+" in subdomain "+i+" Eigenvalue number "+j+"  = "+ev[j]);
+		if(ev[j] < tauThresholdGeneo || j==0)
+		{
+			real[int] zit = eV[j][];
+			real[int] zitemp = Dih[i]*zit;
+//			int k  = i*nev+j;
+			Z[ncoarsespace][]=Rih[i]'*zitemp;
+			ncoarsespace++;
+			evtemp = ev[j+1];
+			cout << "evtemp = " << evtemp << endl;
+		}
+		// GENEO criterium
+	}
+	if(i==0)
+	{
+		smallestEigNotinGeneo = evtemp;		
+	}
+	else
+	{
+		smallestEigNotinGeneo = min(smallestEigNotinGeneo,evtemp);
+	}
+	cout << "smallestEigNotinGeneo = " << smallestEigNotinGeneo << endl;		
+}
+	Z.resize(ncoarsespace);
+	cout << "Total size of the coarse space " << ncoarsespace << endl;
+	cout << " smallestEigNotinGeneo = " << smallestEigNotinGeneo << endl;
+	if(smallestEigNotinGeneo < tauThresholdGeneo)
+	{
+		cout << "!!!!!! Some Geneo eigenvalues are still bad,  tauThresholdGeneo = " << tauThresholdGeneo << endl;
+		cout << "!!!!!! Enlarge the maximum size of the Geneo Coarse Space " << endl;
+	}
+}
+real[int,int] Ef(ncoarsespace,ncoarsespace);   // E = Z^T*A*Z
+for(int i=0;i<ncoarsespace;++i)
+{  
+	real[int] vaux = Aglobal*Z[i][];	
+    for(int j=0;j<ncoarsespace;++j)
+        Ef(j,i) = Z[j][]'*vaux;	
+}
+matrix E;
+E = Ef;
+cout << "Factorisation de la matrice de l'espace grossier " << endl;
+set(E,solver=UMFPACK);
+/*# finCoarseSpace #*/  
+/*# debutPCGSolve #*/
+include "PCG-CS.idp"
+Vh un = 0, sol;                                   // initial guess un and final solution 
+cout << "Schwarz Dirichlet algorithm" << endl;
+sol[] = myPCG(un[], tol, maxit);       // PCG with initial guess un
+plot(sol,cmm=" Final solution", wait=1,dim=3,fill=1,value=1);
+Vh er = sol-uglob;
+cout << " Final error: " << er[].linfty << endl; 
+/*# finPCGSolve #*/

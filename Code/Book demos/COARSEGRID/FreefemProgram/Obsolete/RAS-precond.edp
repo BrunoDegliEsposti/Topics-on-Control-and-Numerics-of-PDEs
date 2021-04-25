@@ -1,0 +1,13 @@
+func real[int] Mm1(real[int] &l)          
+{	
+   s = 0;
+   for(int i=0;i<npart;++i)
+     {
+       mesh Thi = aTh[i];
+       real[int] bi = Rih[i]*l;       // restricts rhs
+       real[int] ui = aA[i] ^-1 * bi; // local solves
+       bi = Dih[i]*ui;                     
+       s[] += Rih[i]'*bi;             // prolongation 
+     } 
+   return s[];	
+}

@@ -1,0 +1,45 @@
+load "metis"
+load "medit"
+load "msh3"
+
+int nn=6,mm=1,ll=1;        // number of the domains in each direction
+int npart= nn*mm*ll;	       // total number of domains
+int nloc = 10;                   // local no of dof per domain in one direction            
+bool withmetis = 1;          // =1 (Metis decomp) =0 (uniform decomp)
+int sizeovr = 2;                 // size of the overlap 
+real allongx, allongz;
+allongx = real(nn)/real(mm);
+allongz = real(ll)/real(mm);
+func E = 2*10^11;                           // Young modulus ans Poisson ratio
+func sigma = 0.3; 
+func lambda = E*sigma/((1+sigma)*(1-2*sigma)); // Lame coefficients
+func mu = E/(2*(1+sigma));
+real sqrt2=sqrt(2.);
+func eta = 1.0e-6;      
+real gravity = -10.0;
+// Build the mesh
+mesh3 Th=cube( nn*nloc,mm*nloc,ll*nloc , [allongx*x , y , allongz*z] );                           // left,right,front, back, down, right
+fespace Vh(Th,[P1,P1,P1]);
+fespace Uh(Th,P1);
+fespace Ph(Th,P0);
+Ph part;                                         // piecewise constant function 
+int[int] lpart(Ph.ndof);                    // giving the decomposition
+// domain decomposition data structures
+mesh3[int] aTh(npart);                   // sequence of ovr. meshes 
+matrix[int] Rih(npart);                     // local restriction operators 
+matrix[int] Dih(npart);                     // partition of unity operators
+int[int] Ndeg(npart);                        // number of dof for each mesh
+real[int] VolumeThi(npart);             // volume of each subdomain
+matrix[int] aA(npart);                       // local Dirichlet matrices
+// Definition of the problem to solve
+Vh [rhsglobal,rrhsglobal,rrrhsglobal], [uglob,uuglob,uuuglob];
+macro epsilon(u,v,w) [dx(u),dy(v),dz(w),(dz(v)+dy(w))/sqrt2,(dz(u)+dx(w))/sqrt2,(dy(u)+dx(v))/sqrt2] // EOM
+macro div(u,v,w) ( dx(u)+dy(v)+dz(w) ) // EOM
+macro Elasticity(u,v,w,uu,vv,ww) eta*(u*uu+v*vv+w*ww) +lambda*div(u,v,w)*div(uu,vv,ww)       
+                                                                                        +2.*mu*( epsilon(u,v,w)'*epsilon(uu,vv,ww)) // EOM 
+varf vaglobal([u,v,w],[uu,vv,ww])= int3d(Th) (Elasticity(u,v,w,uu,vv,ww))-int3d(Th)(gravity*ww)
+                                                     +on(2,u=1,v=1,w=1) ;
+matrix Aglobal;
+// Iterative solver parameters
+real tol=1e-5;                                     // tolerance for the iterative method
+int maxit=200;                                    // maximum number of iterations

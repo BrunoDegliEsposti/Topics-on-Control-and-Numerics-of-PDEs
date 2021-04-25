@@ -1,0 +1,42 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataHelmholtz.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],sizeovr,aTh,Rihreal,Dihreal,Ndeg,AreaThi);
+for (int i=0; i<npart; i++) {
+	Rih[i] = Rihreal[i];
+	Dih[i] = Dihreal[i];
+}  
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = UMFPACK);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                // global rhs
+uglob[] = Aglobal^-1*rhsglobal[]; 
+Vh realuglob = real(uglob);
+plot(realuglob,dim=3,wait=1,cmm="Exact solution", value =1,fill=1);
+/*# finGlobalData #*/
+/*# debutLocalData #*/        
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl;
+    mesh Thi = aTh[i];
+    fespace Vhi(Thi,P1);
+    varf RobinInt(u,v) =  int2d(Thi)(-k^2*u*v+Grad(u)'*Grad(v))
+                                  + int1d(Thi,Robin)(1i*k*u*v) + on(Dirichlet, u=g)  
+                                  + int1d(Thi,10)(alpha*u*v);
+    aR[i] = RobinInt(Vhi,Vhi);
+    
+   // matrix<complex> temp = Aglobal*Rih[i]';
+   // aR[i] = Rih[i]*temp;
+    
+    set(aR[i],solver = UMFPACK);       // direct solvers using UMFPACK
+  } 
+/*# finLocalData #*/
+/*# debutGMRESsolve #*/
+include "GMRES.idp"
+Vh<complex> un = 0, sol, er;            // initial guess, final solution and error
+sol[] =  GMRES(un[], tol, maxit);
+plot(sol,dim=3,wait=1,cmm="Final solution",value =1,fill=1);
+er[] = sol[]-uglob[];
+cout << "Final scaled error = " << er[].linfty/uglob[].linfty << endl;
+/*# finGMRESsolve #*/

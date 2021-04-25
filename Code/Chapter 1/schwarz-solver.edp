@@ -1,0 +1,52 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataGENEO.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,AreaThi);  
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = UMFPACK);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                               // global rhs
+uglob[] = Aglobal^-1*rhsglobal[]; 
+plot(uglob,value=1,fill=1,dim=3,wait=1,cmm="Solution by a direct method");
+/*# finGlobalData #*/
+/*# debutLocalData #*/        
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = UMFPACK);// direct solvers
+  } 
+/*# finLocalData #*/
+/*# debutSchwarzIter #*/
+ofstream filei("Conv.m");   
+Vh un = 0;                             // initial guess
+Vh rn = rhsglobal;
+for(int iter = 0;iter<maxit;++iter)
+  {
+    real err = 0, res;
+    Vh er = 0;
+    for(int i = 0;i<npart;++i)
+      {
+        real[int] bi = Rih[i]*rn[];    // restriction to the local domain
+        real[int] ui = aA[i] ^-1 * bi; // local solve
+        bi = Dih[i]*ui;
+    //  bi = ui;  // uncomment this line to test the ASM method as a solver
+        er[] += Rih[i]'*bi;
+      }
+    un[] += er[];             // build new iterate
+    rn[] = Aglobal*un[];      // computes global residual 
+    rn[] = rn[] - rhsglobal[];
+    rn[] *= -1;  
+    err = sqrt(er[]'*er[]);
+    res = sqrt(rn[]'*rn[]);
+    cout << "Iteration: " << iter << " Correction = " << err << " Residual = " << res << endl;
+    plot(un,value=1,wait=1,fill=0,cmm="Approximate solution at step " + iter);;//fill=1,dim=3);   
+    int j = iter+1;
+    // Store the error and the residual in Matlab/Scilab/Octave form
+    filei << "Convhist("+j+",:)=[" << err << " " << res <<"];" << endl;
+    if(err < tol) break;
+  }
+plot(un,wait=1,value=1,fill=1,dim=3,cmm="Final solution");
+/*# finSchwarzIter #*/

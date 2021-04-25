@@ -1,0 +1,42 @@
+/*# debutGlobalMatvec #*/
+func real[int] A(real[int] &x)
+{
+	// Matrix vector product with the global matrix
+	Vh Ax;
+	Ax[]= Aglobal*x; 
+	return Ax[];
+}
+/*# finGlobalMatvec #*/
+/*# debutASPrecond #*/
+// and the application of the preconditioner
+func real[int] AS(real[int] &l)      
+{	
+   // Application of the ASM preconditioner
+   // M^{-1}*y = \sum Ri^T*Ai^{-1}*Ri*y
+   // Ri restriction operators, Ai  =Ri*A*Ri^T local matrices
+   Vh s = 0;
+   for(int i=0;i<npart;++i)
+     {
+       real[int] bi = Rih[i]*l;        // restricts rhs
+       real[int] ui = aA[i] ^-1 * bi;  // local solves
+       s[] += Rih[i]'*ui;              // prolongation      
+      }   
+   return s[];	
+}  
+/*# finASPrecond #*/
+/*# debutRASPrecond #*/
+func real[int] RAS(real[int] &l)      
+{	
+   // Application of the RAS preconditioner
+   // M^{-1}*y = \sum Ri^T*Di*Ai^{-1}*Ri*y
+   // Ri restriction operators, Ai  =Ri*A*Ri^T local matrices
+   Vh s = 0;
+   for(int i=0;i<npart;++i)  {             
+       real[int] bi = Rih[i]*l;           // restricts rhs
+       real[int] ui = aA[i] ^-1 * bi;  // local solves
+       bi = Dih[i]*ui;                      // partition of unity
+       s[] += Rih[i]'*bi;                  // prolongation 
+      }    
+   return s[];	
+}  
+/*# finRASPrecond #*/

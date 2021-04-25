@@ -1,0 +1,11 @@
+include "createPartition.edp";
+
+include "decompMetis.edp";
+
+include "globaldata.edp";
+
+include "localdata.edp";
+
+include "RAS-precond.edp";
+
+include "BiCGStab-solve-CS.edp";

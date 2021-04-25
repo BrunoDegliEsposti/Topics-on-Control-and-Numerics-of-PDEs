@@ -1,0 +1,14 @@
+int nn=6,mm=6;
+int npart= nn*mm;
+int nloc = 20;
+real allongement = 1;
+allongement = real(nn)/real(mm);
+
+mesh Th=square(nn*nloc*allongement,mm*nloc,[x*allongement,y]);
+fespace Vh(Th,P1);
+fespace Ph(Th,P0);
+
+Ph  part;
+Ph xx=x,yy=y;
+part = int(xx/allongement*nn)*mm + int(yy*mm); // manual partition
+plot(part, fill=1,value=1,wait=1,cmm="uniform decomposition",ps="decompunif.eps");

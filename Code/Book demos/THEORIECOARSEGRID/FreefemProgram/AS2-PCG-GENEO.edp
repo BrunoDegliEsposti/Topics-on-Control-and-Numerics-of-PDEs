@@ -1,0 +1,39 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataGENEO.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,AreaThi); 
+plot(part,wait=1,fill=1,ps="partition.eps");
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = UMFPACK);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                // global rhs
+uglob[] = Aglobal^-1*rhsglobal[]; 
+/*# finGlobalData #*/
+/*# debutLocalData #*/   
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = UMFPACK);       // direct solvers using UMFPACK
+    varf valocal(u,v) = int2d(aTh[i])(eta*u*v+ka*(Grad(u)'*Grad(v)))
+                              +on(1,u=g);           
+    fespace Vhi(aTh[i],P1);                          
+    aN[i]= valocal(Vhi,Vhi);
+    set(aN[i], solver = UMFPACK);   
+    matrix atimesxi = aA[i] * Dih[i]; 
+    aAweighted[i] = Dih[i] * atimesxi; 
+ } 
+/*# finLocalData #*/  
+/*# debutPCGSolve #*/
+include "../../FreefemCommon/matvecAS.idp"
+include "GENEO.idp"
+include "PCG-CS.idp"
+Vh un = 0, sol;                                   // initial guess un and final solution 
+cout << "Schwarz Dirichlet algorithm" << endl;
+sol[] = myPCG(un[], tol, maxit);       // PCG with initial guess un
+plot(sol,cmm=" Final solution", wait=1,dim=3,fill=1,value=1);
+Vh er = sol-uglob;
+cout << " Final relative error: " << er[].linfty/sol[].linfty << endl; 
+/*# finPCGSolve #*/

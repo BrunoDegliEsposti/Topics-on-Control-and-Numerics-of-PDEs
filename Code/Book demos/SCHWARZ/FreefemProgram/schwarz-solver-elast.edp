@@ -1,0 +1,57 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataElast.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartitionVec.idp"
+SubdomainsPartitionUnityVec(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,AreaThi);  
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = UMFPACK);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                // global rhs
+uglob[] = Aglobal^-1*rhsglobal[]; 
+real coeff2 = 1;
+mesh Thmv=movemesh(Th,[x+coeff2*uglob,y+coeff2*uuglob]);
+medit("Thmv", Thmv);
+medit("uex", Th, uglob, Th, uuglob, order=1);
+/*# finGlobalData #*/
+/*# debutLocalData #*/
+Thmv=Th;        
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = UMFPACK);// direct solvers
+  } 
+/*# finLocalData #*/
+/*# debutSchwarzIter #*/
+ofstream filei("Conv.m");   
+Vh [un,uun] = [0,0];                             // initial guess
+Vh [rn,rrn] = [rhsglobal,rrhsglobal];
+for(int iter = 0;iter<maxit;++iter)
+  {
+    real err = 0, res;
+    Vh [er,eer] = [0,0];
+    for(int i = 0;i<npart;++i)
+      {
+        real[int] bi = Rih[i]*rn[];    // restriction to the local domain
+        real[int] ui = aA[i] ^-1 * bi; // local solve
+        bi = Dih[i]*ui;
+        // bi = ui;  // uncomment this line to test the ASM method as a solver
+        er[] += Rih[i]'*bi;
+      }
+    un[] += er[];             // build new iterate
+    rn[] = Aglobal*un[];      // computes global residual 
+    rn[] = rn[] - rhsglobal[];
+    rn[] *= -1;  
+    err = sqrt(er[]'*er[]);
+    res = sqrt(rn[]'*rn[]);
+    cout << "Iteration: " << iter << " Correction = " << err << " Residual = " << res << endl;
+    int j = iter+1;
+    // Store the error and the residual in Matlab/Scilab/Octave form
+    filei << "Convhist("+j+",:)=[" << err << " " << res <<"];" << endl;
+    if(res < tol) break;
+  }
+mesh Thm=movemesh(Th,[x+coeff2*un,y+coeff2*uun]);
+medit("Thm", Thm);
+medit("uh", Th, un, Th, uun, order=1);
+/*# finSchwarzIter #*/

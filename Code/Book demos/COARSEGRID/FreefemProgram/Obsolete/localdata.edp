@@ -1,0 +1,15 @@
+// overlapping partition
+int sizeoverlaps = 3;
+mesh[int] aTh(npart);         // sequence of overlapping meshes 
+matrix[int] Rih(npart);       // local restriction operators 
+matrix[int] Dih(npart);       // partition of unity operators  
+SubdomainsPartitionUnity(Th, part[], sizeoverlaps, aTh, Rih, Dih);
+
+matrix[int] aA(npart);                      // local Dirichlet matrix        
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = UMFPACK);            // use direct solvers locally
+  } 

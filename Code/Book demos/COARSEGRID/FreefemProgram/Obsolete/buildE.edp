@@ -1,0 +1,16 @@
+Vh[int]  Z(npart);
+for(int i=0;i<npart;++i)
+{	Z[i]=1.;
+	real[int] zit = Rih[i]*Z[i][];
+	real[int] zitemp = Dih[i]*zit;
+	Z[i][]=Rih[i]'*zitemp;
+}
+real[int,int] Ef(npart,npart);   // E = Z^T*A*Z
+for(int i=0;i<npart;++i)
+{  real[int] vaux = A(Z[i][]);	
+   for(int j=0;j<npart;++j)
+	  Ef(j,i) = Z[j][]'*vaux;
+}
+matrix E;
+E = Ef;
+set(E,solver=UMFPACK);

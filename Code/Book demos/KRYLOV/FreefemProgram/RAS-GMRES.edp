@@ -1,0 +1,29 @@
+/*# debutPartition #*/
+include "../../FreefemCommon/dataGENEO.edp"
+include "../../FreefemCommon/decomp.idp"
+include "../../FreefemCommon/createPartition.idp"
+SubdomainsPartitionUnity(Th,part[],sizeovr,aTh,Rih,Dih,Ndeg,AreaThi);  
+/*# endPartition #*/
+/*# debutGlobalData #*/
+Aglobal = vaglobal(Vh,Vh,solver = UMFPACK);  // global matrix
+rhsglobal[] = vaglobal(0,Vh);                                // global rhs
+uglob[] = Aglobal^-1*rhsglobal[]; 
+/*# finGlobalData #*/
+/*# debutLocalData #*/        
+for(int i = 0;i<npart;++i)
+  {
+    cout << " Domain :" << i << "/" << npart << endl; 
+    matrix aT = Aglobal*Rih[i]'; 
+    aA[i] =  Rih[i]*aT;        
+    set(aA[i],solver = UMFPACK);       // direct solvers using UMFPACK
+  } 
+/*# finLocalData #*/
+/*# debutGMRESsolve #*/
+include "../../FreefemCommon/matvecAS.idp"
+include "GMRES.idp"
+Vh un = 0, sol, er;                             // initial guess, final solution and error
+sol[] =  GMRES(un[], tol, maxit);
+plot(sol,dim=3,wait=1,cmm="Final solution",value =1,fill=1);
+er[] = sol[]-uglob[];
+cout << "Final error = " << er[].linfty/uglob[].linfty << endl;
+/*# finGMRESsolve #*/

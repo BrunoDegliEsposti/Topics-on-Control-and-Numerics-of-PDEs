@@ -1,0 +1,105 @@
+// bug in partition fixed January 27th 2016
+include "getARGV.idp"
+/*# beginPartition #*/
+func bool SubdomainsPartitionUnity(mesh & Th, real[int] & partdof, int sizeoverlaps, mesh[int] & aTh, matrix[int] & Rih, matrix[int] & Dih, int[int] & Ndeg, real[int] & AreaThi)
+{
+  int 	npart=partdof.max+1;
+  mesh Thi=Th;                  // freefem's trick, formal definition
+  fespace Vhi(Thi,P1);          // freefem's trick, formal definition
+  Vhi[int] pun(npart);          // local fem functions 
+  Vh  sun=0, unssd=0;
+  
+  for(int ii=0;ii<npart;++ii)
+    {
+
+	    int[int] arrayIntersection;
+	    int[int][int] restrictionIntersection(0);
+	    real[int] D;
+
+	     int numberIntersection = 0;
+          
+       
+		  mesh overlapName=Th;
+          fespace VhGlobal(overlapName, P1);
+		  fespace PhGlobal(overlapName, P0);
+		  PhGlobal part;
+		  part[]=partdof;
+		  
+          PhGlobal supp = abs(part - ii) < 0.1;
+		  Thi= trunc(overlapName, abs(part - ii) < 0.1, label = 10);
+          VhGlobal suppSmooth;
+          AddLayers(overlapName, supp[], sizeoverlaps * 2, suppSmooth[]);
+          {   mesh neighbors = trunc(overlapName, suppSmooth > 0.001 && (suppSmooth < 0.999));
+              fespace Oh(neighbors, P0);
+              Oh partOverlap = part;
+          
+              Unique(partOverlap[], arrayIntersection);          
+                 
+          }
+          fespace Vhl(Thi, P1);
+          Vhl[int] partitionIntersection(arrayIntersection.n);
+          
+          overlapName = trunc(overlapName, suppSmooth > 0.001);
+          supp = supp;
+          suppSmooth = suppSmooth;
+          Thi = trunc(overlapName, suppSmooth> 0.501, label = 10);
+          
+          
+		  /*
+		  real oooo = 0.5001-0.5/sizeoverlaps;
+          mesh borderName = trunc(overlapName, (suppSmooth >(sizeoverlaps-0.999 )/(2*sizeoverlaps)) && (suppSmooth < 0.501), label = 20);
+          */
+          
+          
+          Vhl khi = max(suppSmooth*2 - 1.0, 0.) ;
+          if(usedARGV("-steep") != -1)
+            khi = khi > 0.001 ? 1.0 : 0.0;
+          Vhl sum = khi;
+          VhGlobal phi = 0;
+		  real eps=int2d(overlapName)(1.);
+          for(int i = 0; i < arrayIntersection.n; ++i) {
+              PhGlobal suppPartition = abs(arrayIntersection[i] - part) < 0.1;
+              AddLayers(overlapName, suppPartition[], sizeoverlaps, phi[]);
+			  if(usedARGV("-steep") != -1)
+                phi = phi > 0.001 ? 1.0 : 0.0;
+              real intersection=int2d(overlapName)(phi)/eps;
+              if( intersection>1e-6)
+              {
+              partitionIntersection[numberIntersection] = phi;
+              sum[] += partitionIntersection[numberIntersection][];
+              arrayIntersection[numberIntersection++] = arrayIntersection[i];
+              }
+
+
+          }
+
+          khi[] = khi[] ./= sum[];
+
+			/*
+          overlapName = trunc(Thi, khi < 0.99);
+          if(numberIntersection != arrayIntersection.n)
+              arrayIntersection.resize(numberIntersection);
+			*/
+
+          Vhi func2vec = khi;
+
+
+          //restrictionIntersection.resize(numberIntersection);
+
+		  aTh[ii]=Thi;
+		  Dih[ii]=func2vec[];
+		 
+		  Rih[ii]=interpolate(Vhi,Vh);
+		  /*
+		  load "thresholdings"
+		  Rih[ii].thresholding(1e-10);
+		  */
+		  Ndeg[ii] = Vhi.ndof;
+		  AreaThi[ii] = int2d(Thi)(1.);
+		
+   			//pun[i] = (abs(pun[i] - 0.5) < 1.e-2 ? (i == 0 ? 0 : 1) : (pun[i] > 0.5 ? 1. : 0.));
+
+		}
+  return true;
+}
+/*# endPartition #*/

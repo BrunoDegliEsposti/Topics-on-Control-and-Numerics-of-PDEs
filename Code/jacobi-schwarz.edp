@@ -1,0 +1,114 @@
+verbosity = 0;
+bool plots = true;
+real a = 0.0;
+
+int gamma11 = 1;
+int gamma12 = 2;
+int gamma22 = 3;
+int gamma21 = 4;
+
+border diskLeft(t = pi/6, 11*pi/6) {
+    x = -1.0/2+cos(t);
+    y = sin(t);
+    label = gamma11;
+}
+border diskRight(t = -pi/6, pi/6) {
+    x = -1.0/2+cos(t);
+    y = sin(t);
+    label = gamma12;
+}
+
+border rectLeftTop(t = a, (sqrt(3)-1)/2) {
+    x = t;
+    y = 1.0/2;
+    label = gamma21;
+}
+border rectRightTop(t = (sqrt(3)-1)/2, 2) {
+    x = t;
+    y = 1.0/2;
+    label = gamma22;
+}
+border rectLeftMiddle(t = -1.0/2, 1.0/2) {
+    x = a;
+    y = t;
+    label = gamma21;
+}
+border rectRightMiddle(t = -1.0/2, 1.0/2) {
+    x = 2;
+    y = t;
+    label = gamma22;
+}
+border rectLeftBottom(t = a, (sqrt(3)-1)/2) {
+    x = t;
+    y = -1.0/2;
+    label = gamma21;
+}
+border rectRightBottom(t = (sqrt(3)-1)/2, 2) {
+    x = t;
+    y = -1.0/2;
+    label = gamma22;
+}
+
+mesh full = buildmesh(diskLeft(50) + diskRight(10)
+    + rectRightBottom(16) + rectRightMiddle(10) + rectRightTop(-16)
+    + rectLeftTop(-4) + rectLeftMiddle(-10) + rectLeftBottom(4));
+func indicatorDisk = (x+0.5)^2+y^2 <= 1+1e-8;
+func indicatorRect = (x>=a-1e-8)&&(x<=2+1e-8)&&(y>=-0.5-1e-8)&&(y<=0.5+1e-8);
+mesh disk = trunc(full,indicatorDisk,label=gamma12);
+mesh rect = trunc(full,indicatorRect,label=gamma21);
+if (plots) {
+    plot(disk,wait=1);
+    plot(rect,wait=1);
+    plot(full,wait=1);
+}
+
+fespace Vh1(disk, P1);
+fespace Vh2(rect, P1);
+fespace Vh(full, P1);
+Vh1 uh1=0, uh1old=0, vh1;
+Vh2 uh2=0, uh2old=0, vh2;
+Vh uh=0, vh;
+int i;
+func f = 1;
+problem poisson1(uh1,vh1,init=i,solver=Cholesky)
+    = int2d(disk)(dx(uh1)*dx(vh1)+dy(uh1)*dy(vh1))
+    - int2d(disk)(f*vh1)
+    + on(gamma12, uh1=uh2old)
+    + on(gamma11, uh1=0);
+problem poisson2(uh2,vh2,init=i,solver=Cholesky)
+    = int2d(rect)(dx(uh2)*dx(vh2)+dy(uh2)*dy(vh2))
+    - int2d(rect)(f*vh2)
+    + on(gamma21, uh2=uh1old)
+    + on(gamma22, uh2=0);
+problem poisson(uh,vh,solver=Cholesky)
+    = int2d(full)(dx(uh)*dx(vh)+dy(uh)*dy(vh))
+    - int2d(full)(f*vh)
+    + on(gamma11, uh=0)
+    + on(gamma22, uh=0);
+
+poisson;
+if (plots) {
+    plot(uh,wait=1);
+}
+Vh1 err1 = uh1-uh;
+Vh2 err2 = uh2-uh;
+cout << "e_1^0 = " << err1[].linfty << "\t";
+cout << "e_2^0 = " << err2[].linfty << endl;
+
+for (i = 1; i <= 20; i++) {
+    // Solve on disk
+    poisson1;
+    err1 = uh1-uh;
+    cout << "e_1^" << i << " = " << err1[].linfty << "\t";
+    // Solve on rectangle
+    poisson2;
+    err2 = uh2-uh;
+    cout << "e_2^" << i << " = " << err2[].linfty << endl;
+    // Update previous solutions
+    uh1old = uh1;
+    uh2old = uh2;
+    // Plot solutions
+    if (plots) {
+        plot(uh1,uh2,wait=1);
+    }
+}

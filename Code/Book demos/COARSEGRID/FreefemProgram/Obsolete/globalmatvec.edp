@@ -1,0 +1,6 @@
+Vh rn, s;   
+func real[int] A(real[int] &l)           // A*u
+{	
+  rn[]= Aglobal*l;
+  return rn[]; 
+}

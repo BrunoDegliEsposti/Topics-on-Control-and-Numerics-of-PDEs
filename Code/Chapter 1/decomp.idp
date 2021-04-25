@@ -1,0 +1,12 @@
+if (withmetis)
+    {
+      metisdual(lpart,Th,npart); // FreeFem++ interface to Metis
+      for(int i=0;i<lpart.n;++i)
+          part[][i]=lpart[i];          
+    }
+  else
+    {
+    Ph xx=x,yy=y;
+    part= int(xx/allong*nn)*mm + int(yy*mm); 
+    }
+plot(part,wait=1,fill=1,value=1);    

@@ -1,0 +1,62 @@
+/*# beginAddLayers #*/
+func bool AddLayers(mesh & Th,real[int] &ssd,int n,real[int] &unssd)
+{
+  //  build a continuous function  uussd (P1) and modifies ssd :
+  //  IN: ssd in the caracteristics function on the input subdomain.
+  //  OUT: ssd is a boolean function, unssd is a smooth function
+  //  ssd = 1 if unssd >0; add n layer of element and unssd = 0 ouside of this layer 
+  Ph s;
+  Uh u;
+  assert(ssd.n==Ph.ndof);
+  assert(unssd.n==Uh.ndof);
+  unssd=0;
+  s[]= ssd;
+  varf vM(uu,v)=int2d(Th,qforder=1)(uu*v/area);
+  matrix M=vM(Ph,Uh);
+  for(int i=0;i<n;++i)
+    {
+      u[]= M*s[];
+      u = u>.1; 
+      unssd+= u[];
+      s[]= M'*u[];
+      s = s >0.1;
+    }
+  unssd /= (n);
+  u[]=unssd;
+  ssd=s[];      
+  return true;
+}
+/*# endAddLayers #*/
+/*# beginPartition #*/
+func bool SubdomainsPartitionUnityVec(mesh & Th, real[int] & partdof, int sizeoverlaps, mesh[int] & aTh, matrix[int] & Rih, matrix[int] & Dih, int[int] & Ndeg, real[int] & AreaThi)
+{
+  int 	npart=partdof.max+1;
+  mesh Thi=Th;                   // freefem's trick, formal definition
+  fespace Vhi(Thi,[P1,P1]);  // freefem's trick, formal definition
+  Vhi[int] [pun,ppun](npart); // local fem functions 
+  Vh  [unssd,uunssd], [sun,ssun]=[0,0];
+  Uh Ussd = 0;
+  Ph part;
+  int[int] U2Vc=[0,1];            //  no component change
+  part[]=partdof;
+  for(int i=0;i<npart;++i)
+    {
+	    Ph suppi= abs(part-i)<0.1;                                 // boolean 1 in the subdomain 0 elswhere
+	    AddLayers(Th,suppi[],sizeoverlaps,Ussd[]);      // ovr partitions by adding layers 
+	    [unssd,uunssd] =[Ussd,Ussd];
+	    Thi=aTh[i]=trunc(Th,suppi>0,label=10,split=1);  // ovr mesh interfaces label 10
+	    Rih[i]=interpolate(Vhi,Vh,inside=1,U2Vc=U2Vc); // Restriction operator : Vh -> Vhi
+	    pun[i][]=Rih[i]*unssd[];
+	    sun[] += Rih[i]'*pun[i][];
+	    Ndeg[i] = Vhi.ndof;
+	    AreaThi[i] = int2d(Thi)(1.);
+   }
+  for(int i=0;i<npart;++i)
+    {
+      Thi=aTh[i];
+      [pun[i],ppun[i]] = [pun[i]/sun, ppun[i]/sun];
+      Dih[i]=pun[i][];                                                      //diagonal matrix built from a vector
+    }
+  return true;
+}
+/*# endPartition #*/

@@ -1,0 +1,54 @@
+load "metis"
+load "medit"
+int nn=6,mm=6;							  // number of the domains in each direction
+int npart= nn*mm;						  // total number of domains
+int nloc = 40;                                  // local no of dof per domain in one direction            
+bool withmetis = 0;                         // =1 (Metis decomp) =0 (uniform decomp) 
+int sizeovr = 2;                                // size of the overlap
+real allong = real(nn)/real(mm);     // aspect ratio of the global domain
+// Mesh of a rectangular domain
+mesh Th=square(nn*nloc,mm*nloc,[x*allong,y]);
+fespace Vh(Th,P1);
+fespace Ph(Th,P0);
+Ph part;                                            // piecewise constant function 
+int[int] lpart(Ph.ndof);                       // giving the decomposition
+// Domain decomposition data structures
+mesh[int] aTh(npart);                       // sequence of ovr. meshes 
+matrix[int] Rihreal(npart);                 // local restriction operators 
+matrix[int] Dihreal(npart);                 // partition of unity operators
+matrix<complex>[int] Rih(npart);      // local restriction operators 
+matrix<complex>[int] Dih(npart);      // partition of unity operators
+int[int] Ndeg(npart);                          // number of dof for each mesh
+real[int] AreaThi(npart);                    // area of each subdomain
+matrix<complex>[int] aA(npart);       // local Dirichlet matrices
+matrix<complex>[int] aR(npart);       // local Robin matrices
+// Definition of the problem to solve
+// -k^2*u - Delta (u) = f, 
+//  u = g, Dirichlet boundary (top and bottom)
+// dn(u) + i k u = 0, Robin boundary (left and right)
+int Dirichlet=1, Robin=2;
+int[int] chlab=[1, Robin, 2, Robin, 3, Robin, 4, Robin];
+Th=change(Th,refe=chlab);
+macro Grad(u) [dx(u),dy(u)]              // EOM
+real k=12.*pi; 
+func f = exp(-((x-.5)^2+(y-.5)^2)*120.);//1;                                          // right hand side 
+func g = 0;                                        // Dirichlet data
+varf vaglobal(u,v) = int2d(Th)(-k^2*u*v+Grad(u)'*Grad(v))
+                             + int1d(Th,Robin)(1i*k*u*v) - int2d(Th)(f*v)+ on(Dirichlet,u=g) ;
+matrix<complex> Aglobal;
+Vh<complex> rhsglobal,uglob;         // rhs and solution of the global problem
+complex alpha = 1i*k;                       // Despres algorithm
+// Optimal alpha:
+// h12: the mesh size for a rectangular domain of dimension 2x1,
+// that is obtained with nnxmm = 2x1,4x2,8x4
+real h21 = 1./(mm*nloc);
+real kplus = k+pi/1; // the rectangle height is 1
+real kminus = k-pi/1;
+real Cw = min(kplus^2-k^2,k^2-kminus^2);
+real alphaOptR = pow(Cw/h21,1/3.)/2;
+complex alphaOpt = alphaOptR + 1i*alphaOptR;
+alpha = alphaOpt;
+//alpha=1.0e30; 
+// Iterative solver
+real tol=1e-4;                                     // tolerance for the iterative method
+int maxit=1000;                                    // maximum number of iterations

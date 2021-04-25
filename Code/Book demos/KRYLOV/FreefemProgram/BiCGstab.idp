@@ -1,0 +1,54 @@
+// Preconditioned BiCGstab Applied to the system
+// M^{-1}Aglobal x = M^{-1}b
+// Here Aglobal denotes the global matrix
+// M^{-1} is the RAS preconditioner based on domain decomposition
+/*# debutBiCGSolve #*/ 
+func real[int] BiCGstab(real[int] xi, real eps, int nbiter){
+	ofstream filei("Convprec.m");
+	Vh r, rb, rs, er, un, p, yn, zn, z, v, t, tn;
+	un[]=xi;	
+	r[]=A(un[]);
+	r[] -= rhsglobal[];     
+	r[] *= -1.0; 	
+	rb[]=r[];	
+	real rho=1.;
+	real alpha=1.;
+	real omega=1.;
+	z[] = RAS(r[]);
+	real resinit=sqrt(z[]'*z[]);
+	p[]=0; v[]=0;	
+	real rhonew, beta;	
+	for(int it =1;it<nbiter;it++){	
+        real relres = sqrt(z[]'*z[])/resinit;
+        cout << "It: "<< it << " Relative residual = " << relres  <<  endl; 
+        int j = it+1;
+        filei << "relres("+j+")=" << relres << ";" << endl;        
+        if(relres < eps){
+            cout << "BiCGstab has converged in " + it + " iterations " << endl;
+            cout << "The relative residual is " +  relres << endl; 
+            break;	
+           }	
+        rhonew=rb[]'*r[];                               // rhoi = (rb,rim1);             
+        beta=(rhonew/rho)*(alpha/omega); // beta = (rhoi/rhoim1)*(alpha/omega); 
+        p[] -=omega*v[];                               // pi = rim1 + beta*(pim1 - omega*vim1);
+        p[] *= beta;
+        p[] += r[];
+        yn[] = RAS(p[]);                               // y = Mm1*pi; vi = A*y;
+        v[] = A(yn[]);
+        alpha = rhonew/(rb[]'*v[]);                // alpha = rhoi/(rb'*vi);	 
+        rs[] = r[];                                           // s = rim1 - alpha*vi;
+        rs[] -= alpha*v[];
+        zn[] = RAS(rs[]);                              // z = Mm1*s; t = A*z;
+        t[] = A(zn[]);
+        tn[] = RAS(t[]);                                // tn = Mm1*t;
+        omega = (tn[]'*zn[])/(tn[]'*tn[]);         // omega = (Mm1*t,Mm1*s)/(Mm1*t,Mm1*t);
+        un[] += alpha*yn[];                           // xi = xim1 + alpha*y + omega*z;
+        un[] += omega*zn[]; 
+        r[] = rs[];
+        r[] -= omega*t[];
+        z[] = RAS(r[]);     
+        rho = rhonew;
+     }
+     return un[];	
+}
+/*# finBiCGSolve #*/

@@ -1,0 +1,148 @@
+// Preconditioned BiCGstab Applied to the system
+// M^{-1}Aglobal x = M^{-1}b
+// Here Aglobal denotes the global matrix
+// M^{-1} is the RAS preconditioner based on domain decomposition
+// In order to use BiCGstab routine define first then matrix-vector product
+/*# debutGlobalMatvec #*/
+func real[int] A(real[int] &x)
+{
+	// Matrix vector product with the global matrix
+	Vh Ax;
+	Ax[]= Aglobal*x; return Ax[];
+}
+/*# finGlobalMatvec #*/
+/*# debutCoarseData #*/  
+Vh[int]  Z(npart);
+for(int i=0;i<npart;++i)
+{	
+	Z[i]=1.;
+	real[int] zit = Rih[i]*Z[i][];
+	real[int] zitemp = Dih[i]*zit;
+	Z[i][]=Rih[i]'*zitemp;
+}
+real[int,int] Ef(npart,npart);   // E = Z^T*A*Z
+for(int i=0;i<npart;++i)
+{  
+	real[int] vaux = A(Z[i][]);	
+	for(int j=0;j<npart;++j)
+	Ef(j,i) = Z[j][]'*vaux;
+}
+matrix E;
+E = Ef;
+set(E,solver=UMFPACK);
+/*# finCoarseData #*/ 
+/*# debutRASPrecond #*/
+// and the application of the preconditioner
+func real[int] Mm1(real[int] &l)      
+{	
+   // Application of the RAS preconditioner
+   // M^{-1}*y = \sum Ri^T*Di*Ai^{-1}*Ri*y
+   // Ri restriction operators, Ai  =Ri*A*Ri^T local matrices
+   Vh s = 0;
+   for(int i=0;i<npart;++i)
+     {             
+       real[int] bi = Rih[i]*l;           // restricts rhs
+       real[int] ui = aA[i] ^-1 * bi;  // local solves
+       bi = Dih[i]*ui;                      // partition of unity
+       s[] += Rih[i]'*bi;                  // prolongation 
+      }   
+   return s[];	
+}  
+/*# finRASPrecond #*/
+/*# debutBNNPrecond #*/
+func real[int] Q(real[int] &l)      // Q = Z*E^-1*Z^T
+{
+	real[int] res(l.n);
+	res=0.;
+	real[int] vaux(npart);
+	for(int i=0;i<npart;++i)
+    {
+		vaux[i]=Z[i][]'*l;
+	}	
+	real[int] zaux=E^-1*vaux;   // zaux=E^-1*Z^T*l
+	for(int i=0;i<npart;++i)        // Z*zaux
+   {
+		res +=zaux[i]*Z[i][];
+   }
+   return res;
+}
+func real[int] P(real[int] &l)   // P = I - A*Q
+{
+   real[int] res=Q(l);
+   real[int] res2=A(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+func real[int] PT(real[int] &l)  // P^T = I-Q*A
+{
+   real[int] res=A(l);
+   real[int] res2=Q(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+func real[int] BNN(real[int] &u)   // precond BNN
+{ 
+    real[int] aux1 = Q(u);
+    real[int] aux2 = P(u);
+    real[int] aux3 = Mm1(aux2);
+    aux2 = PT(aux3);
+    aux2 += aux1;	
+    //++j;
+	return aux2;	
+}
+/*# finBNNPrecond #*/
+/*# debutBiCGSolve #*/ 
+func real[int] BiCGstabCS(real[int] xi, real eps, int nbiter)
+{
+	ofstream filei("Convprec.m");
+	Vh r, rb, rs, er, un, p, yn, zn, z, v, t, tn;
+	un[]=xi;	
+	r[]=A(un[]);
+	r[] -= rhsglobal[];     
+	r[] *= -1.0; 	
+	rb[]=r[];	
+	real rho=1.;
+	real alpha=1.;
+	real omega=1.;
+	z[] = BNN(r[]);
+	real resinit=sqrt(z[]'*z[]);
+	p[]=0; v[]=0;	
+	real rhonew, beta;	
+	for(int it =1;it<nbiter;it++)
+	  {	
+        real relres = sqrt(z[]'*z[])/resinit;
+        cout << "It: "<< it << " Relative residual = " << relres  <<  endl; 
+        int j = it+1;
+        filei << "relres("+j+")=" << relres << ";" << endl;        
+        if(relres < eps)
+           {
+            cout << "BiCGstab has converged in " + it + " iterations " << endl;
+            cout << "The relative residual is " +  relres << endl; 
+            break;	
+           }	
+        rhonew=rb[]'*r[];                               // rhoi = (rb,rim1);             
+        beta=(rhonew/rho)*(alpha/omega); // beta = (rhoi/rhoim1)*(alpha/omega); 
+        p[] -=omega*v[];                               // pi = rim1 + beta*(pim1 - omega*vim1);
+        p[] *= beta;
+        p[] += r[];
+        yn[] = BNN(p[]);                               // y = Mm1*pi; vi = A*y;
+        v[] = A(yn[]);
+        alpha = rhonew/(rb[]'*v[]);                // alpha = rhoi/(rb'*vi);	 
+        rs[] = r[];                                           // s = rim1 - alpha*vi;
+        rs[] -= alpha*v[];
+        zn[] = BNN(rs[]);                              // z = Mm1*s; t = A*z;
+        t[] = A(zn[]);
+        tn[] = BNN(t[]);                                // tn = Mm1*t;
+        omega = (tn[]'*zn[])/(tn[]'*tn[]);         // omega = (Mm1*t,Mm1*s)/(Mm1*t,Mm1*t);
+        un[] += alpha*yn[];                           // xi = xim1 + alpha*y + omega*z;
+        un[] += omega*zn[]; 
+        r[] = rs[];
+        r[] -= omega*t[];
+        z[] = BNN(r[]);     
+        rho = rhonew;
+     }
+     return un[];	
+}
+/*# finBiCGSolve #*/

@@ -1,0 +1,49 @@
+load "metis"	// mesh partitioner
+load "medit"	// OpenGL-based scientific visualization software
+
+//===== PARAMETERS OF THE DOMAIN DECOMPOSITION =====//
+int nn = 4, mm = 16;    // number of the domains in each direction
+int npart = nn*mm;      // total number of domains
+int nloc = 10;          // local no of dof per domain in one direction
+bool withmetis = 1;     // =1 (Metis decomp) =0 (uniform decomp)
+int sizeovr = 1;        // size of the geometric overlap between subdomains, algebraic overlap is sizeovr+1
+real allong = real(nn)/real(mm);     // aspect ratio of the global domain
+
+// Mesh of a rectangular domain
+mesh Th=square(nn*nloc,mm*nloc,[x*allong,y]);
+fespace Vh(Th,P1);
+fespace Ph(Th,P0);
+Ph part;                                            // piecewise constant function
+int[int] lpart(Ph.ndof);                       // giving the decomposition
+// Domain decomposition data structures
+mesh[int] aTh(npart);                       // sequence of subdomain meshes
+matrix[int] Rih(npart);                       // local restriction operators
+matrix[int] Dih(npart);                       // partition of unity operators
+int[int] Ndeg(npart);                          // number of dof for each mesh
+real[int] AreaThi(npart);                    // area of each subdomain
+matrix[int] aA(npart),aN(npart);        // local matrices
+Vh[int]  Z(npart);
+Vh intern;
+intern = (x>0) && (x<allong) && (y>0) && (y<1) ;
+
+//===== PARAMETERS OF THE PDE =====//
+// Definition of the problem to solve
+// -\Delta(u) + ru = f,
+// u = 0 on the global boundary
+// int[int] chlab=[1,1  ,2,1  ,3,1  ,4,1  ];
+// Th=change(Th,refe=chlab);			// all label borders are set to one
+macro Grad(u) [dx(u),dy(u)]              // EOM
+func f = 1;         // Right hand side
+func g = 0;         // Dirichlet boundary condition
+func kappa = 1.0;   // Viscosity
+func eta = 0.0;     // Reaction term
+Vh rhsglobal,uglob; // rhs and solution of the global problem
+varf vaglobal(u,v) = int2d(Th)(eta*u*v)
+     + int2d(Th)(kappa*Grad(u)'*Grad(v))
+     + int2d(Th)(f*v)
+     + on(1,2,3,4,u=g);
+matrix Aglobal;
+
+//===== PARAMETERS OF THE ITERATIVE SOLVER =====//
+real tol=1e-6;		// tolerance for the iterative method
+int maxit=300;		// maximum number of iterations

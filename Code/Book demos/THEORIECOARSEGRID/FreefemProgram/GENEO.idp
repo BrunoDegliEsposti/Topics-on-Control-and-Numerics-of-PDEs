@@ -1,0 +1,69 @@
+/*# debutZ #*/
+for(int i=0;i<npart;++i)
+{		
+	mesh Thi = aTh[i];
+	fespace Vhi(Thi,P1);
+	Vhi[int] eV(abs(nev));
+	real[int] ev(abs(nev));	
+	if (nev > 0){//GENEO coarse space	 
+	int k = EigenValue(aN[i],aAweighted[i],sym=true,sigma=0,maxit=50,tol=1.e-4,value=ev,vector=eV);
+	cout << "Eigenvalues in the subdomain  "<< i <<endl;
+	k=min(k,nev); 					//sometimes the no of converged eigenvalues is bigger than nev.
+	cout << ev <<endl;	 
+	}
+	else// Nicolaides Coarse space
+	{
+		eV[0][] = 1.; 
+	}
+	
+	for(int j=0;j<abs(nev);++j){	
+		real[int] zitemp = Dih[i]*eV[j][];
+		int k = i*abs(nev)+j;	 
+		Z[k][]=Rih[i]'*zitemp;
+	 }
+}
+/*# finZ #*/
+/*# debutE #*/
+real[int,int] Ef(ncoarsespace,ncoarsespace);   // E = Z^T*A*Z
+for(int i=0;i<ncoarsespace;++i)
+{  
+	real[int] vaux = Aglobal*Z[i][];	
+	for(int j=0;j<ncoarsespace;++j)
+		Ef(j,i) = Z[j][]'*vaux;	
+}
+matrix E;
+E = Ef;
+set(E,solver=UMFPACK);
+/*# finE #*/
+/*# debutQ #*/
+func real[int] Q(real[int] &l)      // Q = Z*E^-1*Z^T
+{
+	real[int] res(l.n);
+	res=0.;
+	real[int] vaux(ncoarsespace);
+	for(int i=0;i<ncoarsespace;++i)
+		vaux[i]=Z[i][]'*l;
+	real[int] zaux=E^-1*vaux;   // zaux=E^-1*Z^T*l
+	for(int i=0;i<ncoarsespace;++i)         // Z*zaux
+		res +=zaux[i]*Z[i][];
+	return res;
+}
+/*# finQ #*/
+/*# debutPPT #*/
+func real[int] P(real[int] &l)   // P = I - A*Q
+{
+   real[int] res=Q(l);
+   real[int] res2=A(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+func real[int] PT(real[int] &l)  // P^T = I-Q*A
+{
+   real[int] res=A(l);
+   real[int] res2=Q(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+/*# endPPT #*/

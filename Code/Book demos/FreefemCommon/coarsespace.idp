@@ -1,0 +1,61 @@
+/*# debutZ #*/
+// Build coarse space
+for(int i=0;i<npart;++i)
+{		
+	Z[i]=1.;
+	Z[i][] = Z[i][].*intern[];
+	real[int] zit = Rih[i]*Z[i][];
+	real[int] zitemp = Dih[i]*zit;
+	Z[i][]=Rih[i]'*zitemp;	
+}
+/*# finZ #*/
+/*# debutE #*/
+real[int,int] Ef(npart,npart);                 // E = Z^T*A*Z
+for(int i=0;i<npart;++i)
+{     	
+   real[int] vaux = A(Z[i][]);	
+   for(int j=0;j<npart;++j)
+	{
+   Ef(j,i) = Z[j][]'*vaux;	
+	}
+}
+matrix E;
+E = Ef;
+set(E,solver=UMFPACK);
+/*# finE #*/
+/*# debutQ #*/
+func real[int] Q(real[int] &l)             // Q = Z*E^-1*Z^T
+{
+   real[int] res(l.n);
+   res=0.;
+   real[int] vaux(npart);
+   for(int i=0;i<npart;++i)
+   {
+   	  vaux[i]=Z[i][]'*l;
+   }	
+   real[int] zaux=E^-1*vaux;             // zaux=E^-1*Z^T*l
+   for(int i=0;i<npart;++i)                  // Z*zaux
+   {
+   	  res +=zaux[i]*Z[i][];
+   }
+   return res;
+}
+/*# finQ #*/
+/*# debutPPT #*/
+func real[int] P(real[int] &l)                 // P = I - A*Q
+{
+   real[int] res=Q(l);
+   real[int] res2=A(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+func real[int] PT(real[int] &l)                // P^T = I-Q*A
+{
+   real[int] res=A(l);
+   real[int] res2=Q(res);
+   res2 -= l;
+   res2 *= -1.;
+   return res2;
+}
+/*# finPPT #*/
